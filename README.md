@@ -1,27 +1,30 @@
 # ScrapLedger
 
-## Product
-ScrapLedger turns Central Pollution Control Board (CPCB) e-waste and battery waste rules into clear, structured Extended Producer Responsibility (EPR) checklists for electronics firms. It acts as a one-click EPR checklist generator for specific producer types, exporting obligations as validated JSON or printable lists. It also features a natural-language data analyst agent (using safe, read-only SQL) to track a firm's EPR targets against filed quantities in a Postgres database, citing the exact rule behind each target.
+## Problem
+Electronics makers and recyclers must meet strict Extended Producer Responsibility (EPR) targets under the E-Waste and Battery Waste rules. The rules, SOPs, and amendments are long, scattered across 800+ pages of dense legal text. Missing a filing step, misunderstanding a formula, or missing a deadline directly leads to heavy financial penalties and environmental compensation charges. Manually parsing these rules to build compliance checklists and track targets is error-prone and time-consuming. ScrapLedger solves this by turning CPCB e-waste and battery waste rules into clear, structured EPR checklists. It uses structured extraction and a natural-language data analyst to track compliance, citing the exact rule behind each obligation.
 
-## Target User
-EHS (Environment, Health, and Safety) executives at electronics manufacturing units (e.g., in Hosur), who are responsible for ensuring strict environmental compliance.
+## Who it is for
+EHS Executive: An Environment, Health, and Safety executive at an electronics manufacturing unit in Hosur who needs to ensure strict environmental compliance and track EPR targets.
+Compliance Officer: A regulatory compliance manager at a battery manufacturing firm who needs to calculate annual EPR obligations and track return deadlines.
 
-## The Problem
-Electronics makers and recyclers must meet stringent EPR targets under the E-Waste and Battery Waste rules. The rules, SOPs, and amendments are scattered across 800+ pages of dense legal and technical text. Missing a filing step, misunderstanding a formula, or missing a deadline directly leads to heavy financial penalties and environmental compensation charges. 
+## Signature feature
+One-Click EPR Checklist & Analyst: Enter a producer type (e.g., laptop manufacturer) to generate a structured EPR integration checklist (exported as validated JSON or a printable list) detailing who, what, deadline, form, and penalty. Additionally, it features a natural-language data analyst agent (using safe, read-only SQL) that queries the firm's EPR targets and filed quantities in a Postgres table, answering questions like "how far are we from this year's e-waste target?" while citing the specific rule behind each target.
 
-## Dataset Source and Size
-*   **Source:** Central Pollution Control Board (CPCB) official portal (https://cpcb.nic.in/)
-*   **Documents:** E-Waste (Management) Rules 2022 and subsequent amendments, Battery Waste Management Rules 2022, CPCB EPR guidelines, SOPs, and relevant hazardous waste rules.
-*   **Size:** Minimum 800+ pages of PDF documents. (First 50+ pages collected for initial prototype).
+## Hardest problem (my interview story)
+The hardest engineering challenge in ScrapLedger is accurately parsing and extracting structured obligations (who, what, deadline, form, penalty) from 800+ pages of dense, poorly formatted government PDFs, and achieving a 90%+ field-level accuracy. Legal documents often span requirements across multiple sections, amendments, and tables. To solve this, I designed a pipeline that chunks the PDFs, embeds them into a PostgreSQL database with pgvector, and uses a structured extraction LLM call validated against strict Pydantic schemas. Additionally, I had to securely combine natural-language Text-to-SQL for querying internal compliance data with RAG for citing the external legal rules, ensuring the AI agent cannot hallucinate targets or execute destructive database queries.
 
-## 10 Real Questions 
-1. What are the EPR collection targets for a producer of laptops in 2026-27?
-2. What returns must a registered recycler file and by when?
-3. What is the penalty for selling batteries without EPR registration?
-4. What is the exact formula to calculate the EPR obligation for a new manufacturer of portable batteries?
-5. Which specific forms must be submitted for the annual e-waste return, and what is the exact deadline?
-6. Under the 2022 rules, what are the specific EPR recycling targets for solar photo-voltaic modules?
-7. How long is an EPR registration valid before a producer needs to apply for renewal?
-8. What are the specific environmental compensation (EC) charges for a 20% shortfall in meeting e-waste collection targets?
-9. Does a company importing batteries for captive consumption need to register on the EPR portal?
-10. **(Unanswerable by the documents):** Which local logistics vendor in Hosur offers the cheapest rates for moving hazardous e-waste to a registered recycling facility?
+## Dataset
+| Source | Link | Documents | Pages | Licence / terms |
+|---|---|---|---|---|
+| Central Pollution Control Board (CPCB) | [cpcb.nic.in](https://cpcb.nic.in/) | E-Waste (Management) Rules 2022, Battery Waste Management Rules 2022, SOPs, and amendments | 800+ pages | Publicly available government regulatory documents |
+
+## 10 real questions
+See [docs/QUESTIONS.md](docs/QUESTIONS.md).
+
+## Run it
+```bash
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+cp .env.example .env                                 # Windows: copy .env.example .env
+uvicorn app.main:app --reload
+curl localhost:8000/health
