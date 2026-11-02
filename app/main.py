@@ -1,82 +1,173 @@
-import time
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from litellm import completion, completion_cost
+import json
+import logging
+import os
 
-app = FastAPI(title="ScrapLedger API")
+# Use local cost map and disable telemetry to prevent network blocking on startup
+os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
+
+from typing import Annotated, Any  # noqa: E402
+
+import litellm  # noqa: E402
+from dotenv import load_dotenv  # noqa: E402
+from fastapi import Depends, FastAPI, HTTPException  # noqa: E402
+from fastapi.responses import StreamingResponse  # noqa: E402
+from litellm import completion, completion_cost  # noqa: E402
+
+from app.config import Settings, get_settings  # noqa: E402
+from app.schemas import ChatRequest, HealthResponse, UsageResponse  # noqa: E402
+
+load_dotenv()
+litellm.telemetry = False
+litellm.drop_params = True
+
+logger = logging.getLogger("scrapledger")
+logging.basicConfig(level=logging.INFO)
+
+app = FastAPI(
+    title="ScrapLedger API",
+    description="Compliance and EPR Analyst Assistant for CPCB regulations",
+    version="0.2.0",
+)
 
 # In-memory database for tracking real API usage and costs
-token_usage_db = {
+token_usage_db: dict[str, Any] = {
     "total_tokens": 0,
-    "cost_usd": 0.0
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "cost_usd": 0.0,
+    "total_calls": 0,
 }
 
-class ChatRequest(BaseModel):
-    query: str
+FALLBACK_MODELS = [
+    "gemini/gemini-flash-latest",
+    "gemini/gemini-1.5-flash",
+    "gemini/gemini-pro-latest",
+    "gpt-4o-mini",
+    "claude-3-haiku-20240307",
+]
 
-class UsageResponse(BaseModel):
-    total_tokens: int
-    cost_usd: float
 
-@app.get("/health")
-def health_check():
+@app.get("/health", response_model=HealthResponse)
+def health_check(settings: Annotated[Settings, Depends(get_settings)]):
     """Health check endpoint for Docker and CI/CD."""
-    return {"status": "ok", "app": "ScrapLedger", "environment": "local"}
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "environment": settings.environment,
+    }
+
 
 @app.get("/usage", response_model=UsageResponse)
 def get_usage():
     """Returns actual LLM token usage and accumulated cost."""
     return token_usage_db
 
+
 @app.post("/chat")
-def chat_with_agent(request: ChatRequest):
+def chat_with_agent(
+    request: ChatRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
+):
     """
-    Calls an LLM to answer compliance queries and returns structured JSON.
-    Includes timeouts, 3 retries, and a fallback model.
+    Calls an LLM to answer compliance queries and returns structured JSON or streams tokens.
+    Includes timeouts, retries, and a multi-provider fallback model chain.
     """
-    # Define primary model (Gemini) and fallback models (OpenAI/Anthropic)
-    models = ["gemini/gemini-1.5-flash", "gpt-4o-mini", "claude-3-haiku-20240307"]
-    
+    models = [request.model] if request.model else []
+    for model in [settings.primary_model] + FALLBACK_MODELS:
+        if model not in models:
+            models.append(model)
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are ScrapLedger, a regulatory compliance assistant for CPCB e-waste "
+                "and battery waste rules. Always return answers in clear, structured JSON format."
+            ),
+        },
+        {"role": "user", "content": request.query},
+    ]
+
+    # Handle streaming response
+    if request.stream:
+        for model in models:
+            try:
+                stream_resp = completion(
+                    model=model,
+                    messages=messages,
+                    stream=True,
+                    timeout=settings.llm_timeout,
+                    num_retries=settings.llm_retries,
+                )
+
+                def event_stream(resp=stream_resp):
+                    for chunk in resp:
+                        delta = chunk.choices[0].delta.content or ""
+                        if delta:
+                            yield f"data: {json.dumps({'content': delta})}\n\n"
+                    yield "data: [DONE]\n\n"
+
+                return StreamingResponse(event_stream(), media_type="text/event-stream")
+            except Exception as e:
+                logger.warning(f"Streaming model {model} failed: {e}. Trying fallback...")
+                continue
+        raise HTTPException(status_code=503, detail="All AI models are currently unavailable.")
+
+    # Handle standard structured JSON response
     for model in models:
         try:
-            # Attempt LLM call with a 10-second timeout and 3 retries
+            extra_kwargs: dict[str, Any] = {}
+            if "gemini" in model:
+                gemini_key = settings.gemini_api_key or os.getenv("GEMINI_API_KEY")
+                if gemini_key:
+                    extra_kwargs["api_key"] = gemini_key
+
             response = completion(
                 model=model,
-                messages=[
-                    {"role": "system", "content": "You are ScrapLedger, a regulatory compliance assistant. Always return answers in clear, structured JSON format."},
-                    {"role": "user", "content": request.query}
-                ],
+                messages=messages,
                 response_format={"type": "json_object"},
-                timeout=10.0,
-                num_retries=3
+                timeout=settings.llm_timeout,
+                num_retries=settings.llm_retries,
+                **extra_kwargs,
             )
-            
-            # Calculate tokens and exact cost for this specific call
-            prompt_tokens = response.usage.prompt_tokens
-            completion_tokens = response.usage.completion_tokens
-            total_tokens = prompt_tokens + completion_tokens
-            cost = completion_cost(completion_response=response)
-            
-            # Update global cost log
-            token_usage_db["total_tokens"] += total_tokens
-            if cost:
-                token_usage_db["cost_usd"] += cost
 
-            # Return structured JSON
+            prompt_tokens = getattr(response.usage, "prompt_tokens", 0) or 0
+            completion_tokens = getattr(response.usage, "completion_tokens", 0) or 0
+            total_tokens = getattr(
+                response.usage, "total_tokens", prompt_tokens + completion_tokens
+            ) or 0
+
+            try:
+                cost = completion_cost(completion_response=response) or 0.0
+            except Exception:
+                cost = 0.0
+
+            # Update global usage accumulator
+            token_usage_db["total_tokens"] += total_tokens
+            token_usage_db["prompt_tokens"] += prompt_tokens
+            token_usage_db["completion_tokens"] += completion_tokens
+            token_usage_db["cost_usd"] = round(token_usage_db["cost_usd"] + cost, 6)
+            token_usage_db["total_calls"] += 1
+
+            raw_content = response.choices[0].message.content or "{}"
+            try:
+                parsed_content = json.loads(raw_content)
+            except Exception:
+                parsed_content = {"response": raw_content}
+
             return {
                 "status": "success",
                 "model_used": model,
-                "response": response.choices[0].message.content,
+                "response": parsed_content,
                 "usage": {
-                    "tokens": total_tokens,
-                    "cost": cost
-                }
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens,
+                    "cost_usd": round(cost, 6),
+                },
             }
-            
         except Exception as e:
-            # If the model fails or times out, the loop continues to the fallback model
-            print(f"Model {model} failed: {e}. Trying fallback...")
+            logger.warning(f"Model {model} failed: {e}. Trying fallback...")
             continue
-            
-    # If all models in the fallback chain fail
+
     raise HTTPException(status_code=503, detail="All AI models are currently unavailable.")

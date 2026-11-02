@@ -1,13 +1,20 @@
-import pytest
-from fastapi.testclient import TestClient
+import os
 
-from app.config import Settings, get_settings
-from app.main import app
+os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.config import Settings, get_settings  # noqa: E402
+from app.main import app  # noqa: E402
 
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[get_settings] = lambda: Settings(app_name="examate-rag", environment="test")
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        app_name="ScrapLedger",
+        environment="test",
+    )
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

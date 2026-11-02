@@ -1,9 +1,7 @@
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
-
-def test_health():
+def test_health(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "app": "ScrapLedger", "environment": "local"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["app"] == "ScrapLedger"
+    assert data["environment"] == "test"
