@@ -28,3 +28,4 @@ pip install -r requirements-dev.txt
 cp .env.example .env                                 # Windows: copy .env.example .env
 uvicorn app.main:app --reload
 curl localhost:8000/health
+```
