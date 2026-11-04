@@ -35,3 +35,22 @@ class HealthResponse(BaseModel):
     status: str = Field(default="ok", description="Liveness check status")
     app: str = Field(default="ScrapLedger", description="Application name")
     environment: str = Field(default="local", description="Deployment environment")
+
+
+class Citation(BaseModel):
+    document: str = Field(..., description="Source document filename")
+    page: int = Field(..., description="Exact page citation number")
+    section: str = Field(default="", description="Section or chapter heading")
+
+
+class AskRequest(BaseModel):
+    query: str = Field(..., description="Question regarding CPCB waste management compliance")
+    top_k: int = Field(default=3, ge=1, le=10, description="Number of relevant chunks to retrieve")
+    model: str | None = Field(default=None, description="Optional model override")
+
+
+class AskResponse(BaseModel):
+    query: str = Field(..., description="The original user query")
+    answer: str = Field(..., description="Synthesized answer based on retrieved regulatory chunks")
+    citations: list[Citation] = Field(default_factory=list, description="Page-level citations")
+    usage: ChatUsage = Field(default_factory=ChatUsage, description="Token usage and cost")

@@ -26,7 +26,7 @@ The service is deployed live on a free Render host:
 ## Dataset
 | Source | Link | Documents | Pages | Licence / terms |
 |---|---|---|---|---|
-| Central Pollution Control Board (CPCB) | [cpcb.nic.in](https://cpcb.nic.in/) | E-Waste (Management) Rules 2022, Battery Waste Management Rules 2022, SOPs, and amendments | 800+ pages | Publicly available government regulatory documents |
+| Central Pollution Control Board (CPCB) / MoEFCC | [cpcb.gov.in](https://cpcb.gov.in/) / [eprewaste.cpcb.gov.in](https://eprewaste.cpcb.gov.in/) / [eprbattery.cpcb.gov.in](https://eprbattery.cpcb.gov.in/) | E-Waste Rules 2022, Battery Waste Rules 2022, Hazardous Waste Rules 2016, ELV Recycling Guidelines, SOPs & Amendments (38 docs) | 537 pages collected (800+ pages full corpus) | Public domain government regulatory gazettes |
 
 ## 10 real questions
 See [docs/QUESTIONS.md](docs/QUESTIONS.md).

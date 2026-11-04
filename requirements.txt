@@ -5,3 +5,4 @@ python-dotenv>=1.0.0
 litellm
 openai
 tenacity
+pypdf>=5.0

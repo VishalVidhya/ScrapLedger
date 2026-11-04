@@ -5,9 +5,7 @@ from fastapi.testclient import TestClient
 
 def make_mock_response(content='{"compliance": "ok"}', prompt_tokens=10, completion_tokens=20):
     mock_resp = MagicMock()
-    mock_resp.choices = [
-        MagicMock(message=MagicMock(content=content))
-    ]
+    mock_resp.choices = [MagicMock(message=MagicMock(content=content))]
     mock_resp.usage = MagicMock(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
@@ -18,8 +16,10 @@ def make_mock_response(content='{"compliance": "ok"}', prompt_tokens=10, complet
 
 def test_chat_success(client: TestClient):
     mock_resp = make_mock_response(content='{"status": "compliant", "penalty": 0}')
-    with patch("app.main.completion", return_value=mock_resp), \
-         patch("app.main.completion_cost", return_value=0.00015):
+    with (
+        patch("app.main.completion", return_value=mock_resp),
+        patch("app.main.completion_cost", return_value=0.00015),
+    ):
         response = client.post("/chat", json={"query": "Check EPR return deadline"})
 
     assert response.status_code == 200
@@ -45,11 +45,12 @@ def test_chat_fallback(client: TestClient):
             raise RuntimeError("Primary model rate limited")
         return mock_resp
 
-    with patch("app.main.completion", side_effect=side_effect), \
-         patch("app.main.completion_cost", return_value=0.0002):
+    with (
+        patch("app.main.completion", side_effect=side_effect),
+        patch("app.main.completion_cost", return_value=0.0002),
+    ):
         response = client.post(
-            "/chat",
-            json={"query": "What are battery waste rules?", "model": "gemini/gemini-flash-latest"}
+            "/chat", json={"query": "What are battery waste rules?", "model": "gemini/gemini-flash-latest"}
         )
 
     assert response.status_code == 200

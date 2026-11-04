@@ -19,9 +19,9 @@ Commit after every class. Tag every Friday: `git tag week-N && git push origin w
 - [x] Tag week-2 pushed
 
 ## Week 3 (tag week-3 by Fri 6 Nov)
-- [ ] Parser keeps page numbers and headings
-- [ ] 500+ pages chunked, embedded and stored in pgvector
-- [ ] POST /ask answers with [document, page] citations
+- [x] Parser keeps page numbers and headings
+- [x] 500+ pages chunked, embedded and stored in pgvector
+- [x] POST /ask answers with [document, page] citations
 - [ ] docs/EVAL_v0.md with my 10 questions scored
 - [ ] Tag week-3 pushed
 
@@ -33,4 +33,5 @@ Commit after every class. Tag every Friday: `git tag week-N && git push origin w
 | 2026-10-25 | Added questions, CPCB dataset, and sample PDFs | 334c580 |
 | 2026-10-25 | Completed Week 1 documentation and DATASET.md | 578de08 |
 | 2026-10-30 | Implemented LLM fallback model chain, /usage endpoint, and Docker setup | b002420 |
-| 2026-11-02 | Completed Week 2: DESIGN.md tables & endpoints, live host docs, test suite | HEAD |
+| 2026-11-02 | Completed Week 2: DESIGN.md tables & endpoints, live host docs, test suite | b487771 |
+| 2026-11-04 | Week 3 (Part 1): 537 pages collected, parser/chunker with headings, vector storage, and /ask with citations | HEAD |
