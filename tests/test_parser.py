@@ -69,3 +69,4 @@ def test_parse_sample_pdf():
         assert "section_heading" in chunk
         assert "chunk_text" in chunk
         assert chunk["token_count"] > 0
+

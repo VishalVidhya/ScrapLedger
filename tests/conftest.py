@@ -2,6 +2,7 @@ import os
 
 os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
 os.environ["OFFLINE_EMBEDDINGS"] = "1"
+os.environ["USE_LOCAL_EMBEDDINGS"] = "1"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

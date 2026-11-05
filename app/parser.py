@@ -165,3 +165,4 @@ def parse_and_chunk_pdf(
             chunk_index += 1
 
     return chunks_data
+

@@ -15,7 +15,13 @@ from fastapi.responses import StreamingResponse  # noqa: E402
 from litellm import completion, completion_cost  # noqa: E402
 
 from app.config import Settings, get_settings  # noqa: E402
-from app.db import init_db, load_chunks_from_cache, search_chunks  # noqa: E402
+from app.db import (  # noqa: E402
+    get_chunk_count,
+    init_db,
+    insert_chunks,
+    load_chunks_from_cache,
+    search_chunks,
+)
 from app.embeddings import get_embedding  # noqa: E402
 from app.schemas import (  # noqa: E402
     AskRequest,
@@ -36,11 +42,26 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize DB schema if available and warm up vector cache
+    # Initialize DB schema if available and warm up vector cache once
     init_db()
-    cache_path = os.getenv("CHUNKS_CACHE_PATH", "data/chunks_store.json")
-    loaded = load_chunks_from_cache(cache_path)
-    logger.info("Warmed up vector store with %d cached regulatory chunks.", loaded)
+    if get_chunk_count() == 0:
+        cache_path = os.getenv("CHUNKS_CACHE_PATH", "data/chunks_store.json")
+        loaded = load_chunks_from_cache(cache_path)
+        if loaded == 0:
+            from app.parser import parse_and_chunk_pdf
+
+            sample_dir = "data/sample"
+            if os.path.exists(sample_dir):
+                sample_chunks = []
+                for fname in sorted(os.listdir(sample_dir)):
+                    if fname.lower().endswith(".pdf"):
+                        sample_chunks.extend(parse_and_chunk_pdf(os.path.join(sample_dir, fname)))
+                for c in sample_chunks:
+                    c["embedding"] = get_embedding(c["chunk_text"], use_fallback_only=True)
+                insert_chunks(sample_chunks)
+                logger.info("Loaded %d sample regulatory chunks on startup.", len(sample_chunks))
+        else:
+            logger.info("Warmed up vector store with %d cached chunks.", loaded)
     yield
 
 

@@ -22,7 +22,7 @@ Commit after every class. Tag every Friday: `git tag week-N && git push origin w
 - [x] Parser keeps page numbers and headings
 - [x] 500+ pages chunked, embedded and stored in pgvector
 - [x] POST /ask answers with [document, page] citations
-- [ ] docs/EVAL_v0.md with my 10 questions scored
+- [x] docs/EVAL_v0.md with my 10 questions scored
 - [ ] Tag week-3 pushed
 
 ## Daily log

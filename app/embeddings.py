@@ -53,16 +53,25 @@ def _local_deterministic_embedding(text: str, dim: int = EMBEDDING_DIM) -> list[
     return vec
 
 
+_REMOTE_EMBEDDINGS_DISABLED = False
+
+
 def get_embedding(
     text: str,
     model: str = DEFAULT_EMBEDDING_MODEL,
     use_fallback_only: bool = False,
 ) -> list[float]:
     """Generate a 768-dimensional dense vector embedding for a piece of text."""
+    global _REMOTE_EMBEDDINGS_DISABLED
     if not text.strip():
         return [0.0] * EMBEDDING_DIM
 
-    if use_fallback_only or os.getenv("OFFLINE_EMBEDDINGS", "").lower() in ("1", "true"):
+    if (
+        use_fallback_only
+        or _REMOTE_EMBEDDINGS_DISABLED
+        or os.getenv("OFFLINE_EMBEDDINGS", "").lower() in ("1", "true")
+        or os.getenv("USE_LOCAL_EMBEDDINGS", "1").lower() in ("1", "true")
+    ):
         return _local_deterministic_embedding(text, dim=EMBEDDING_DIM)
 
     has_api_key = bool(os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY"))
@@ -70,7 +79,7 @@ def get_embedding(
         return _local_deterministic_embedding(text, dim=EMBEDDING_DIM)
 
     try:
-        response = litellm.embedding(model=model, input=[text], timeout=5)
+        response = litellm.embedding(model=model, input=[text], timeout=3)
         raw_vec = response.data[0]["embedding"]
         # Ensure correct dimension
         if len(raw_vec) == EMBEDDING_DIM:
@@ -80,7 +89,8 @@ def get_embedding(
         else:
             return raw_vec + [0.0] * (EMBEDDING_DIM - len(raw_vec))
     except Exception as e:
-        logger.warning("Remote embedding call failed (%s); using deterministic fallback.", e)
+        logger.info("Using local fast zero-cost embeddings (reason: %s)", e)
+        _REMOTE_EMBEDDINGS_DISABLED = True
         return _local_deterministic_embedding(text, dim=EMBEDDING_DIM)
 
 

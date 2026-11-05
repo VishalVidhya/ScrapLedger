@@ -11,7 +11,7 @@ import logging
 import os
 from typing import Any
 
-from app.embeddings import cosine_similarity
+from app.embeddings import cosine_similarity, get_embedding
 
 logger = logging.getLogger(__name__)
 
@@ -244,8 +244,12 @@ def load_chunks_from_cache(file_path: str = "data/chunks_store.json") -> int:
     try:
         with open(file_path, encoding="utf-8") as fp:
             data = json.load(fp)
+            for c in data:
+                if "embedding" not in c:
+                    c["embedding"] = get_embedding(c["chunk_text"], use_fallback_only=True)
             _IN_MEMORY_CHUNKS = data
             return len(_IN_MEMORY_CHUNKS)
     except Exception as e:
         logger.warning("Failed loading chunks cache from %s: %s", file_path, e)
         return 0
+
